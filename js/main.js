@@ -41,6 +41,20 @@ const year = g
   .attr("font-size", "40px")
   .attr("text-anchor", "end");
 
+const legend = g.append("g").attr("transform", `translate(${WIDTH - 10}, ${HEIGHT - 125})`);
+const tip = d3
+  .tip()
+  .attr("class", "d3-tip")
+  .html((d) => {
+    let text = `<strong>Country:</strong> <span style="color: red; text-transform: capitalize">${d.country}</span><br>`;
+    text += `<strong>Continent:</strong> <span style="color: red; text-transform: capitalize">${d.continent}</span><br>`;
+    text += `<strong>Life Expectancy:</strong> <span style="color: red;">${d3.format(".2f")(d.life_exp)}</span><br>`;
+    text += `<strong>GDP Per Capita:</strong> <span style="color: red;">${d3.format("$,.0f")(d.income)}</span><br>`;
+    text += `<strong>Population:</strong> <span style="color: red;">${d3.format(",.0f")(d.population)}</span><br>`;
+    return text;
+  });
+g.call(tip);
+
 const x = d3.scaleLog();
 const y = d3.scaleLinear();
 const r = d3.scaleLinear();
@@ -52,6 +66,20 @@ const yAxisGroup = g.append("g").attr("class", "y axis");
 let i = 0;
 
 d3.json("data/data.json").then(function (data) {
+  color.domain(Array.from(new Set(data.flatMap((year) => year.countries.map((c) => c.continent)))).sort());
+  color.domain().forEach((continent, i) => {
+    const legendRow = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
+
+    legendRow.append("rect").attr("height", 10).attr("width", 10).attr("fill", color(continent));
+    legendRow
+      .append("text")
+      .attr("x", -10)
+      .attr("y", 10)
+      .attr("text-anchor", "end")
+      .style("text-transform", "capitalize")
+      .text(continent);
+  });
+
   const filteredData = data.map((d) => {
     const obj = d;
     return {
@@ -76,7 +104,6 @@ function update(data) {
   x.domain([100, 150000]).range([0, WIDTH]);
   y.domain([0, 90]).range([HEIGHT, 0]);
   r.domain([0, d3.max(data.countries, (d) => Math.sqrt(d.population / Math.PI))]).range([5, 25]);
-  color.domain(Array.from(new Set(data.countries.map((c) => c.continent))).sort());
 
   const xAxisCall = d3.axisBottom(x).tickValues([400, 4000, 40000]).tickFormat(d3.format("$"));
   xAxisGroup.transition(t).call(xAxisCall);
@@ -91,10 +118,12 @@ function update(data) {
   circles
     .enter()
     .append("circle")
+    .attr("fill", (d) => color(d.continent))
+    .on("mouseover", tip.show)
+    .on("mouseout", tip.hide)
     .merge(circles)
     .transition(t)
     .attr("cx", (d) => x(d.income))
     .attr("cy", (d) => y(d.life_exp))
-    .attr("r", (d) => r(Math.sqrt(d.population / Math.PI)))
-    .attr("fill", (d) => color(d.continent));
+    .attr("r", (d) => r(Math.sqrt(d.population / Math.PI)));
 }
