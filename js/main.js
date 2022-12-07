@@ -64,6 +64,12 @@ const xAxisGroup = g.append("g").attr("class", "x axis").attr("transform", `tran
 const yAxisGroup = g.append("g").attr("class", "y axis");
 
 let i = 0;
+let interval;
+let filteredData;
+let play = true;
+let continent = "all";
+let max;
+let min;
 
 d3.json("data/data.json").then(function (data) {
   color.domain(Array.from(new Set(data.flatMap((year) => year.countries.map((c) => c.continent)))).sort());
@@ -80,7 +86,7 @@ d3.json("data/data.json").then(function (data) {
       .text(continent);
   });
 
-  const filteredData = data.map((d) => {
+  filteredData = data.map((d) => {
     const obj = d;
     return {
       ...obj,
@@ -88,16 +94,60 @@ d3.json("data/data.json").then(function (data) {
     };
   });
 
-  d3.interval(() => {
-    i++;
-    if (i === filteredData.length) i = 0;
-    update(filteredData[i]);
-  }, 100);
+  max = parseInt(filteredData[filteredData.length - 1].year);
+  min = parseInt(filteredData[0].year);
+  initializeSlider();
 
   update(filteredData[i]);
 });
 
+function step() {
+  i++;
+  if (i === filteredData.length) i = 0;
+  update(filteredData[i]);
+}
+
+$("#play-button").on("click", (e) => {
+  const buttonText = play ? "Pause" : "Play";
+  e.target.textContent = buttonText;
+  if (play) {
+    interval = setInterval(step, 100);
+  } else {
+    clearInterval(interval);
+  }
+  play = !play;
+});
+
+$("#reset-button").on("click", (e) => {
+  i = 0;
+  update(filteredData[i]);
+});
+
+$("#continent-select").on("change", (e) => {
+  continent = e.target.value;
+  update(filteredData[i]);
+});
+
+function initializeSlider() {
+  $("#date-slider").slider({
+    max,
+    min,
+    step: 1,
+    range: false,
+    slide: (event, ui) => {
+      i = ui.value - min;
+      update(filteredData[i]);
+    },
+  });
+}
+
 function update(data) {
+  if (continent !== "all") {
+    data = {
+      ...data,
+      countries: data.countries.filter((d) => d.continent === continent),
+    };
+  }
   year.text(data.year);
   const t = d3.transition().duration(100);
 
@@ -119,6 +169,8 @@ function update(data) {
     .enter()
     .append("circle")
     .attr("fill", (d) => color(d.continent))
+    .attr("stroke", "white")
+    .attr("stroke-width", 0.75)
     .on("mouseover", tip.show)
     .on("mouseout", tip.hide)
     .merge(circles)
@@ -126,4 +178,7 @@ function update(data) {
     .attr("cx", (d) => x(d.income))
     .attr("cy", (d) => y(d.life_exp))
     .attr("r", (d) => r(Math.sqrt(d.population / Math.PI)));
+
+  $("#year").text(data.year);
+  $("#date-slider").slider("value", parseInt(data.year));
 }
